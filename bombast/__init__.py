@@ -175,6 +175,16 @@ def configure(path):
             print('Warning: option "{}" is unused.'.format(option),
                   file=sys.stderr)
 
+def compose_maps(preprocesses):
+    keys = preprocesses[0].keys()
+    result = {}
+    for key in keys:
+        value = key
+        for mapping in preprocesses:
+            value = mapping[value]
+        result[key] = value
+    return result
+
 def main():
     parser = argparse.ArgumentParser(description='Obfuscate Python source code.')
     parser.add_argument('infile', type=argparse.FileType('rb'),
@@ -197,10 +207,12 @@ def main():
     random.seed(args.seed)
     root = ast.parse(args.infile.read())
 
+    preprocesses = []
     # Choose renamings
     for _ in range(args.iters):
         preprocess = Preprocess()
         preprocess.visit(root)
+        preprocesses.append(preprocess)
 
         bombast = Bombast(preprocess)
         root = bombast.visit(root)
@@ -211,7 +223,7 @@ def main():
 
     print(astunparse.unparse(root), file=args.outfile)
     if args.show_translations:
-        for original, obfuscated in preprocess.mapping.items():
+        for original, obfuscated in compose_maps(preprocesses).mapping.items():
             print(original, '=', obfuscated)
 
 if __name__ == '__main__':
