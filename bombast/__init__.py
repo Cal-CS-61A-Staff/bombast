@@ -22,8 +22,6 @@ class Preprocess(ast.NodeVisitor):
     def rename(self, input):
         if input in self.ignores:
             return
-        elif input in self.imports:
-            return
         new_name = random.randident(4, 10)
         while new_name in self.mapping.values():
             new_name = random.randident(4, 10)
@@ -82,8 +80,18 @@ class Bombast(ast.NodeTransformer):
     def visit_Name(self, node):
         return Name(id=self.rename(node.id), ctx=node.ctx)
 
+    def is_import(self, node):
+        if isinstance(node, Attribute):
+            return self.is_import(node.value)
+        if isinstance(node, Name):
+            return node.id in self.imports
+        return False # does not cover other cases
+
     def visit_Attribute(self, node):
-        attr = self.rename(node.attr)
+        if self.is_import(node):
+            attr = node.attr
+        else:
+            attr = self.rename(node.attr)
         return Attribute(value=self.visit(node.value), attr=attr, ctx=node.ctx)
 
     def visit_ExceptHandler(self, node):
@@ -138,13 +146,14 @@ class Bombast(ast.NodeTransformer):
         bases = [self.visit(b) for b in node.bases]
         body = [self.visit(b) for b in node.body]
         decorator_list = [self.visit(d) for d in node.decorator_list]
+        keywords = [self.visit(keyword) for keyword in node.keywords]
         if VERSION[:2] < (3, 5):
             return ClassDef(name, bases,
-                            node.keywords, node.starargs, node.kwargs,
+                            keywords, node.starargs, node.kwargs,
                             body, decorator_list)
         else:
             return ClassDef(name, bases,
-                            node.keywords, body, decorator_list)
+                            keywords, body, decorator_list)
 
     def rename_alias(self, alias_node):
         return alias(alias_node.name, self.rename(assigned_name(alias_node)))
@@ -189,11 +198,11 @@ def main():
     root = ast.parse(args.infile.read())
 
     # Choose renamings
-    preprocess = Preprocess()
-    preprocess.visit(root)
-
-    bombast = Bombast(preprocess)
     for _ in range(args.iters):
+        preprocess = Preprocess()
+        preprocess.visit(root)
+
+        bombast = Bombast(preprocess)
         root = bombast.visit(root)
 
     # Postprocessing
