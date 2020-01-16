@@ -212,7 +212,7 @@ def main():
     for _ in range(args.iters):
         preprocess = Preprocess()
         preprocess.visit(root)
-        preprocesses.append(preprocess)
+        preprocesses.append(preprocess.mapping)
 
         bombast = Bombast(preprocess)
         root = bombast.visit(root)
@@ -223,7 +223,7 @@ def main():
 
     print(astunparse.unparse(root), file=args.outfile)
     if args.show_translations:
-        for original, obfuscated in compose_maps(preprocesses).mapping.items():
+        for original, obfuscated in compose_maps(preprocesses).items():
             print(original, '=', obfuscated)
 
 if __name__ == '__main__':
